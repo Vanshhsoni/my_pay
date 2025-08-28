@@ -14,7 +14,7 @@ client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_S
 @login_required(login_url="/accounts/login/")
 def payment_page(request):
     if request.method == "POST":
-        amount = 1  # 1 Rs = 100 paise
+        amount = 100  # 1 Rs = 100 paise
         
         print("=== CREATING ORDER ===")
         print(f"Amount: {amount}")
