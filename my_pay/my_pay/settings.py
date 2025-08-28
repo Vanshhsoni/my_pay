@@ -110,16 +110,17 @@ WSGI_APPLICATION = 'my_pay.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'my_pay',   # database name
+        'NAME': 'neondb',   # 👈 yaha pe my_pay ki jagah neondb likho
         'USER': 'neondb_owner',
         'PASSWORD': 'npg_DFOBxaXCof89',
         'HOST': 'ep-purple-morning-ad11ohkv-pooler.c-2.us-east-1.aws.neon.tech',
         'PORT': '5432',
         'OPTIONS': {
-            'sslmode': 'require',   # 👈 Neon requires SSL
+            'sslmode': 'require',
         },
     }
 }
+
 
 
 
