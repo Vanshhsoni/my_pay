@@ -30,7 +30,8 @@ RAZORPAY_KEY_ID = "rzp_live_RAc1wpiDhkienh"
 RAZORPAY_KEY_SECRET = "CHYJZyFtP5Sy1FWx22nJSrIv"
 
 
-
+CSRF_COOKIE_SECURE = False  # Add this for testing
+CSRF_COOKIE_HTTPONLY = False  # Add this for testing
 
 INSTALLED_APPS = [
     'django.contrib.admin',
