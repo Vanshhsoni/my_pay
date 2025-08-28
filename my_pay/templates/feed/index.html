@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+{% load socialaccount %}
+<html>
+<head>
+    <title>Landing Page</title>
+    <style>
+        body { background:#e8f5e9; font-family: Arial; margin:0; padding:0; }
+        header { display:flex; justify-content:space-between; align-items:center; padding:15px 30px; background:#c8e6c9; }
+        header h2 { margin:0; color:#2e7d32; }
+        .profile-wrapper { display:flex; align-items:center; gap:10px; }
+        .profile-pic {
+            width:40px; height:40px; border-radius:50%; object-fit:cover; cursor:pointer;
+        }
+        .btn {
+            background:green; color:white; padding:12px 20px;
+            border:none; border-radius:8px; cursor:pointer;
+        }
+        .logout-btn {
+            background:#d32f2f; color:white; padding:8px 14px;
+            border:none; border-radius:8px; cursor:pointer;
+        }
+        .popup {
+            display:none; position:fixed; top:0; left:0;
+            width:100%; height:100%; background:rgba(0,0,0,0.5);
+        }
+        .popup-content {
+            background:white; padding:20px; border-radius:10px;
+            margin:100px auto; width:300px; text-align:center;
+        }
+        .popup button {
+            margin:10px; padding:10px 15px; border:none;
+            border-radius:8px; background:green; color:white; cursor:pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <h2>🌿 My Green App</h2>
+        <div class="profile-wrapper">
+            {% if user.is_authenticated %}
+                {% with user.socialaccount_set.first as account %}
+                    {% if account.extra_data.picture %}
+                        <img src="{{ account.extra_data.picture }}" class="profile-pic">
+                    {% else %}
+                        <img src="https://i.pinimg.com/564x/8e/0f/0d/8e0f0df689458c77a6b0f5dfd0d95d45.jpg" class="profile-pic">
+                    {% endif %}
+                {% endwith %}
+                <form method="post" action="{% url 'account_logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="logout-btn">Logout</button>
+                </form>
+            {% else %}
+                <a href="{% provider_login_url 'google' %}">
+                    <img src="https://i.pinimg.com/564x/8e/0f/0d/8e0f0df689458c77a6b0f5dfd0d95d45.jpg" class="profile-pic">
+                </a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- Landing Content -->
+    <main style="text-align:center; padding:50px;">
+        <h1>🌿 Welcome to Landing Page</h1>
+        <p>Some random green content goes here.</p>
+        <button class="btn" onclick="goToPay()">PAY</button>
+    </main>
+
+    <!-- Popup (if not logged in) -->
+    <div class="popup" id="authPopup">
+        <div class="popup-content">
+            <h3>Login Required</h3>
+            <a href="{% provider_login_url 'google' %}">
+                <button>Sign in with Google</button>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function goToPay() {
+            {% if user.is_authenticated %}
+                window.location.href = "/payment/";
+            {% else %}
+                document.getElementById("authPopup").style.display = "block";
+            {% endif %}
+        }
+    </script>
+</body>
+</html>

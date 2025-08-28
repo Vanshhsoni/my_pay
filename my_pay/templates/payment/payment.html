@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Payment Debug</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body style="text-align:center; background:#e8f5e9; font-family:Arial; padding:20px;">
+  <h2>Payment Debug Mode</h2>
+  
+  {% if not order_id %}
+  <form method="POST">
+    {% csrf_token %}
+    <button type="submit" style="padding:12px 20px; background:green; color:white; border:none; border-radius:8px;">
+      Pay ₹1 (Debug Mode)
+    </button>
+  </form>
+  {% endif %}
+
+  {% if order_id %}
+  <div id="debug-info" style="background:#fff3cd; padding:15px; margin:20px auto; max-width:600px; border-radius:8px; text-align:left;">
+    <h3>Debug Information:</h3>
+    <p><strong>Order ID:</strong> {{ order_id }}</p>
+    <p><strong>Amount:</strong> {{ amount }} paise (₹1)</p>
+    <p><strong>Razorpay Key:</strong> {{ razorpay_key }}</p>
+  </div>
+
+  <div id="status" style="margin:20px; padding:15px; background:#f8f9fa; border-radius:8px;">
+    <p id="current-status">Waiting for payment...</p>
+  </div>
+
+  <script>
+    function updateStatus(message, color = '#333') {
+      const statusEl = document.getElementById('current-status');
+      statusEl.innerHTML = message;
+      statusEl.style.color = color;
+      console.log('STATUS:', message);
+    }
+
+    var options = {
+        "key": "{{ razorpay_key }}",
+        "amount": "{{ amount }}",
+        "currency": "INR",
+        "name": "Payment Debug Test",
+        "description": "Testing Payment Flow",
+        "order_id": "{{ order_id }}",
+        
+        "handler": function (response) {
+            updateStatus("✅ Payment successful! Processing...", "green");
+            console.log("=== PAYMENT SUCCESS RESPONSE ===");
+            console.log("Payment ID:", response.razorpay_payment_id);
+            console.log("Order ID:", response.razorpay_order_id);
+            console.log("Signature:", response.razorpay_signature);
+            console.log("Full Response:", response);
+            
+            // Send to backend for verification
+            updateStatus("📤 Sending to backend for verification...", "blue");
+            
+            fetch("/payment/verify/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                body: new URLSearchParams(response).toString()
+            })
+            .then(res => {
+                console.log("Backend response status:", res.status);
+                return res.json();
+            })
+            .then(data => {
+                console.log("=== BACKEND RESPONSE ===");
+                console.log(data);
+                
+                if (data.status === "success") {
+                    updateStatus("✅ Backend verification successful! Redirecting...", "green");
+                    setTimeout(() => {
+                        window.location.href = "/payment/success/";
+                    }, 1000);
+                } else {
+                    updateStatus("❌ Backend verification failed: " + (data.error || "Unknown error"), "red");
+                    console.error("Verification failed:", data);
+                }
+            })
+            .catch(error => {
+                console.error("=== FETCH ERROR ===");
+                console.error(error);
+                updateStatus("❌ Network error: " + error.message, "red");
+            });
+        },
+        
+        "modal": {
+            "ondismiss": function() {
+                updateStatus("❌ Payment cancelled by user", "orange");
+                console.log("Payment modal dismissed");
+            }
+        },
+        
+        "theme": {
+            "color": "#0f9d58"
+        }
+    };
+
+    console.log("=== RAZORPAY OPTIONS ===");
+    console.log(options);
+    
+    updateStatus("🚀 Opening Razorpay checkout...", "blue");
+    var rzp1 = new Razorpay(options);
+    
+    rzp1.on('payment.failed', function (response) {
+        console.log("=== PAYMENT FAILED ===");
+        console.log(response.error);
+        updateStatus("❌ Payment failed: " + response.error.description, "red");
+    });
+    
+    rzp1.open();
+  </script>
+  
+  {% endif %}
+
+  <div style="margin-top:30px; padding:20px; background:#fff; border-radius:8px; max-width:600px; margin:30px auto;">
+    <h3>Debug Steps:</h3>
+    <ol style="text-align:left;">
+      <li>Open browser console (F12)</li>
+      <li>Make payment</li>
+      <li>Check console logs for errors</li>
+      <li>Check Django terminal for backend logs</li>
+    </ol>
+  </div>
+</body>
+</html>
