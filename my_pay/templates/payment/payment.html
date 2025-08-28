@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Payment Debug</title>
+  <title>Payment Debug - Verification Issue</title>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body style="text-align:center; background:#e8f5e9; font-family:Arial; padding:20px;">
-  <h2>Payment Debug Mode</h2>
+  <h2>Payment Debug - Fixing Verification</h2>
   
   {% if error %}
   <div style="background:#ffebee; color:#c62828; padding:15px; margin:20px auto; max-width:600px; border-radius:8px;">
@@ -29,107 +29,151 @@
     <p><strong>Order ID:</strong> {{ order_id }}</p>
     <p><strong>Amount:</strong> {{ amount }} paise (₹1)</p>
     <p><strong>Razorpay Key:</strong> {{ razorpay_key }}</p>
+    <p><strong>Verify URL:</strong> <code>/payment/verify/</code></p>
   </div>
 
   <div id="status" style="margin:20px; padding:15px; background:#f8f9fa; border-radius:8px;">
-    <p id="current-status">Initializing payment...</p>
+    <p id="current-status">Starting payment process...</p>
   </div>
 
-  <div id="debug-log" style="margin:20px; padding:15px; background:#f0f0f0; border-radius:8px; text-align:left; font-family:monospace; font-size:12px; max-height:200px; overflow-y:scroll;"></div>
+  <!-- Simple debug log -->
+  <div id="simple-log" style="margin:20px; padding:15px; background:#f9f9f9; border-radius:8px; text-align:left; font-family:monospace; font-size:12px; max-height:300px; overflow-y:scroll; white-space: pre-wrap;"></div>
 
   <script>
-    function updateStatus(message, color = '#333') {
-      const statusEl = document.getElementById('current-status');
-      statusEl.innerHTML = message;
-      statusEl.style.color = color;
-      addDebugLog('STATUS: ' + message);
-    }
-
-    function addDebugLog(message) {
-      const debugLog = document.getElementById('debug-log');
+    // Simple logging function
+    function log(message) {
+      const logEl = document.getElementById('simple-log');
       const timestamp = new Date().toLocaleTimeString();
-      debugLog.innerHTML += `[${timestamp}] ${message}<br>`;
-      debugLog.scrollTop = debugLog.scrollHeight;
-      console.log(`[${timestamp}] ${message}`);
+      const logMessage = `[${timestamp}] ${message}\n`;
+      logEl.textContent += logMessage;
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(logMessage);
     }
 
-    addDebugLog('=== PAYMENT DEBUG STARTED ===');
-    addDebugLog('Order ID: {{ order_id }}');
-    addDebugLog('Amount: {{ amount }} paise');
-    addDebugLog('Razorpay Key: {{ razorpay_key }}');
+    function updateStatus(message, color = '#333') {
+      document.getElementById('current-status').innerHTML = message;
+      document.getElementById('current-status').style.color = color;
+      log('STATUS: ' + message);
+    }
+
+    // Test if verification endpoint is reachable
+    function testVerifyEndpoint() {
+      log('=== TESTING VERIFY ENDPOINT ===');
+      
+      fetch('/payment/verify/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: 'test=true'
+      })
+      .then(response => {
+        log(`Verify endpoint test - Status: ${response.status}`);
+        return response.text();
+      })
+      .then(text => {
+        log(`Verify endpoint test - Response: ${text.substring(0, 100)}...`);
+      })
+      .catch(error => {
+        log(`Verify endpoint test - ERROR: ${error.message}`);
+      });
+    }
+
+    // Test the endpoint first
+    testVerifyEndpoint();
+
+    log('=== INITIALIZING RAZORPAY ===');
+    log('Order ID: {{ order_id }}');
+    log('Amount: {{ amount }}');
+    log('Key: {{ razorpay_key }}');
 
     var options = {
         "key": "{{ razorpay_key }}",
         "amount": "{{ amount }}",
         "currency": "INR",
-        "name": "Payment Debug Test",
-        "description": "Testing Payment Flow - ₹1",
+        "name": "Debug Payment",
+        "description": "Testing verification flow",
         "order_id": "{{ order_id }}",
         
         "handler": function (response) {
-            addDebugLog('=== PAYMENT SUCCESS HANDLER CALLED ===');
-            addDebugLog('Payment ID: ' + response.razorpay_payment_id);
-            addDebugLog('Order ID: ' + response.razorpay_order_id);
-            addDebugLog('Signature: ' + response.razorpay_signature);
+            log('=== PAYMENT SUCCESS HANDLER TRIGGERED ===');
+            log('This means payment was completed successfully!');
+            log('Payment ID: ' + response.razorpay_payment_id);
+            log('Order ID: ' + response.razorpay_order_id);
+            log('Signature: ' + response.razorpay_signature);
             
-            updateStatus("✅ Payment successful! Verifying...", "green");
+            updateStatus("✅ Payment completed! Now verifying...", "green");
             
-            // Validate response
-            if (!response.razorpay_payment_id || !response.razorpay_order_id || !response.razorpay_signature) {
-                addDebugLog('ERROR: Missing required fields in payment response');
-                updateStatus("❌ Incomplete payment response", "red");
+            // Check if all required fields are present
+            if (!response.razorpay_payment_id) {
+                log('ERROR: Missing razorpay_payment_id');
+                updateStatus("❌ Missing payment ID", "red");
                 return;
             }
-            
-            // Prepare data for backend
-            const formData = new FormData();
+            if (!response.razorpay_order_id) {
+                log('ERROR: Missing razorpay_order_id');
+                updateStatus("❌ Missing order ID", "red");
+                return;
+            }
+            if (!response.razorpay_signature) {
+                log('ERROR: Missing razorpay_signature');
+                updateStatus("❌ Missing signature", "red");
+                return;
+            }
+
+            // Prepare form data
+            const formData = new URLSearchParams();
             formData.append('razorpay_payment_id', response.razorpay_payment_id);
             formData.append('razorpay_order_id', response.razorpay_order_id);
             formData.append('razorpay_signature', response.razorpay_signature);
             formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-            
-            addDebugLog('=== SENDING TO BACKEND ===');
-            addDebugLog('URL: /payment/verify/');
-            addDebugLog('Method: POST');
-            
-            updateStatus("📤 Sending to backend for verification...", "blue");
-            
-            fetch("/payment/verify/", {
-                method: "POST",
-                body: formData,
-                credentials: 'same-origin'  // Important for Django CSRF
+
+            log('=== SENDING VERIFICATION REQUEST ===');
+            log('URL: /payment/verify/');
+            log('Data: ' + formData.toString());
+
+            updateStatus("📤 Sending verification request...", "blue");
+
+            fetch('/payment/verify/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: formData.toString()
             })
             .then(response => {
-                addDebugLog('Backend response status: ' + response.status);
-                addDebugLog('Backend response ok: ' + response.ok);
+                log(`Verification response status: ${response.status}`);
+                log(`Verification response ok: ${response.ok}`);
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    throw new Error(`HTTP ${response.status}`);
                 }
                 
                 return response.json();
             })
             .then(data => {
-                addDebugLog('=== BACKEND RESPONSE ===');
-                addDebugLog(JSON.stringify(data, null, 2));
+                log('=== VERIFICATION RESPONSE ===');
+                log('Response data: ' + JSON.stringify(data, null, 2));
                 
-                if (data.status === "success") {
-                    updateStatus("✅ Payment verified successfully! Redirecting...", "green");
-                    addDebugLog('SUCCESS: Payment verified, redirecting to success page');
+                if (data.status === 'success') {
+                    updateStatus("✅ Verification successful! Redirecting...", "green");
+                    log('SUCCESS: Redirecting to success page');
+                    
                     setTimeout(() => {
-                        window.location.href = "/payment/success/";
+                        window.location.href = '/payment/success/';
                     }, 2000);
                 } else {
-                    const errorMsg = data.error || "Unknown verification error";
-                    updateStatus("❌ Verification failed: " + errorMsg, "red");
-                    addDebugLog('ERROR: Backend verification failed - ' + errorMsg);
+                    updateStatus("❌ Verification failed: " + (data.error || 'Unknown error'), "red");
+                    log('VERIFICATION FAILED: ' + (data.error || 'Unknown error'));
                 }
             })
             .catch(error => {
-                addDebugLog('=== FETCH ERROR ===');
-                addDebugLog('Error: ' + error.message);
-                addDebugLog('Stack: ' + error.stack);
-                updateStatus("❌ Network error: " + error.message, "red");
+                log('=== VERIFICATION REQUEST FAILED ===');
+                log('Error: ' + error.message);
+                log('This means the request to /payment/verify/ failed');
+                updateStatus("❌ Verification request failed: " + error.message, "red");
             });
         },
         
@@ -141,9 +185,9 @@
         
         "modal": {
             "ondismiss": function() {
-                addDebugLog('=== PAYMENT CANCELLED ===');
-                addDebugLog('User dismissed payment modal');
-                updateStatus("❌ Payment cancelled by user", "orange");
+                log('=== PAYMENT MODAL DISMISSED ===');
+                log('User cancelled payment');
+                updateStatus("❌ Payment cancelled", "orange");
             }
         },
         
@@ -152,48 +196,50 @@
         }
     };
 
-    addDebugLog('=== INITIALIZING RAZORPAY ===');
-    
     try {
-        updateStatus("🚀 Opening Razorpay checkout...", "blue");
+        log('Creating Razorpay instance...');
         var rzp1 = new Razorpay(options);
         
         rzp1.on('payment.failed', function (response) {
-            addDebugLog('=== PAYMENT FAILED ===');
-            addDebugLog('Error code: ' + response.error.code);
-            addDebugLog('Error description: ' + response.error.description);
-            addDebugLog('Error source: ' + response.error.source);
-            addDebugLog('Error step: ' + response.error.step);
-            addDebugLog('Error reason: ' + response.error.reason);
+            log('=== PAYMENT FAILED EVENT ===');
+            log('Error: ' + JSON.stringify(response.error, null, 2));
             updateStatus("❌ Payment failed: " + response.error.description, "red");
         });
         
+        log('Opening Razorpay modal...');
+        updateStatus("🚀 Opening payment modal...", "blue");
+        
         rzp1.open();
-        updateStatus("💳 Payment modal opened - Complete your payment", "blue");
-        addDebugLog('Payment modal opened successfully');
+        
+        updateStatus("💳 Payment modal opened - complete your payment", "blue");
+        log('Modal opened successfully');
         
     } catch (error) {
-        addDebugLog('=== RAZORPAY INITIALIZATION ERROR ===');
-        addDebugLog('Error: ' + error.message);
-        updateStatus("❌ Failed to initialize payment: " + error.message, "red");
+        log('=== RAZORPAY INITIALIZATION ERROR ===');
+        log('Error: ' + error.message);
+        updateStatus("❌ Failed to initialize Razorpay: " + error.message, "red");
     }
   </script>
   
   {% endif %}
 
   <div style="margin-top:30px; padding:20px; background:#fff; border-radius:8px; max-width:600px; margin:30px auto;">
-    <h3>Debug Instructions:</h3>
+    <h3>🔍 What This Debug Version Does:</h3>
     <ol style="text-align:left;">
-      <li><strong>Watch the debug log above</strong> - Real-time status updates</li>
-      <li><strong>Open browser console (F12)</strong> - Check for errors</li>
-      <li><strong>Check Django terminal</strong> - Look for backend logs</li>
-      <li><strong>Complete the payment</strong> - Use any payment method</li>
-      <li><strong>If verification fails</strong> - Check the exact error message</li>
+      <li><strong>Tests verify endpoint</strong> before payment</li>
+      <li><strong>Logs every step</strong> of the payment process</li>
+      <li><strong>Shows exactly where it fails</strong> (if it does)</li>
+      <li><strong>Uses simplified request handling</strong></li>
     </ol>
     
-    <div style="background:#fff3cd; padding:15px; margin-top:15px; border-radius:5px; text-align:left;">
-      <h4>⚠️ Important:</h4>
-      <p>If payment succeeds but verification fails, the money will show as "attempted" in Razorpay dashboard. This means the payment needs to be captured manually or refunded.</p>
+    <div style="background:#e3f2fd; padding:15px; margin-top:15px; border-radius:5px; text-align:left;">
+      <h4>📋 What to Check:</h4>
+      <p><strong>1. Does "PAYMENT SUCCESS HANDLER TRIGGERED" appear?</strong><br>
+         - If NO: Payment isn't completing successfully</p>
+      <p><strong>2. Does verification request get sent?</strong><br>
+         - If NO: JavaScript error preventing the request</p>
+      <p><strong>3. Does Django log show verification endpoint being hit?</strong><br>
+         - If NO: Request isn't reaching your server</p>
     </div>
   </div>
 </body>
