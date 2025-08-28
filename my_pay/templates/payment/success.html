@@ -1,2 +1,110 @@
-<h1>✅ Payment Successful!</h1>
-<a href="/">Go Home</a>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Successful</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .success-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        .success-icon {
+            font-size: 64px;
+            color: #4caf50;
+            margin-bottom: 20px;
+        }
+        .success-title {
+            color: #2e7d32;
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+        .payment-details {
+            background: #f1f8e9;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .home-button {
+            background: #4caf50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        .home-button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="success-container">
+        <div class="success-icon">✅</div>
+        <h1 class="success-title">Payment Successful!</h1>
+        <p>Your payment has been processed successfully.</p>
+        
+        {% if payment_id or order_id or amount %}
+        <div class="payment-details">
+            <h3>Payment Details</h3>
+            {% if payment_id %}
+            <div class="detail-row">
+                <strong>Payment ID:</strong>
+                <span>{{ payment_id }}</span>
+            </div>
+            {% endif %}
+            {% if order_id %}
+            <div class="detail-row">
+                <strong>Order ID:</strong>
+                <span>{{ order_id }}</span>
+            </div>
+            {% endif %}
+            {% if amount %}
+            <div class="detail-row">
+                <strong>Amount:</strong>
+                <span>₹{{ amount|floatformat:0|add:0|div:100 }}</span>
+            </div>
+            {% endif %}
+            <div class="detail-row">
+                <strong>Status:</strong>
+                <span style="color: #4caf50; font-weight: bold;">SUCCESS</span>
+            </div>
+        </div>
+        {% endif %}
+        
+        <a href="/" class="home-button">Go to Home</a>
+        
+        <p style="margin-top: 30px; color: #666; font-size: 14px;">
+            Thank you for your payment! You will receive a confirmation email shortly.
+        </p>
+    </div>
+</body>
+</html>

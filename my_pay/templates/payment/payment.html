@@ -7,7 +7,14 @@
 <body style="text-align:center; background:#e8f5e9; font-family:Arial; padding:20px;">
   <h2>Payment Debug Mode</h2>
   
-  {% if not order_id %}
+  {% if error %}
+  <div style="background:#ffebee; color:#c62828; padding:15px; margin:20px auto; max-width:600px; border-radius:8px;">
+    <h3>Error:</h3>
+    <p>{{ error }}</p>
+  </div>
+  {% endif %}
+  
+  {% if not order_id and not error %}
   <form method="POST">
     {% csrf_token %}
     <button type="submit" style="padding:12px 20px; background:green; color:white; border:none; border-radius:8px;">
@@ -20,12 +27,12 @@
   <div id="debug-info" style="background:#fff3cd; padding:15px; margin:20px auto; max-width:600px; border-radius:8px; text-align:left;">
     <h3>Debug Information:</h3>
     <p><strong>Order ID:</strong> {{ order_id }}</p>
-    <p><strong>Amount:</strong> {{ amount }} paise (₹1)</p>
+    <p><strong>Amount:</strong> {{ amount }} paise (₹{{ amount|floatformat:0|add:0|div:100 }})</p>
     <p><strong>Razorpay Key:</strong> {{ razorpay_key }}</p>
   </div>
 
   <div id="status" style="margin:20px; padding:15px; background:#f8f9fa; border-radius:8px;">
-    <p id="current-status">Waiting for payment...</p>
+    <p id="current-status">Initializing payment...</p>
   </div>
 
   <script>
@@ -36,62 +43,84 @@
       console.log('STATUS:', message);
     }
 
+    // Add more detailed logging
+    function logToConsole(title, data) {
+      console.log(`=== ${title} ===`);
+      console.log(data);
+    }
+
     var options = {
         "key": "{{ razorpay_key }}",
         "amount": "{{ amount }}",
         "currency": "INR",
         "name": "Payment Debug Test",
-        "description": "Testing Payment Flow",
+        "description": "Testing Payment Flow - ₹1",
         "order_id": "{{ order_id }}",
         
         "handler": function (response) {
             updateStatus("✅ Payment successful! Processing...", "green");
-            console.log("=== PAYMENT SUCCESS RESPONSE ===");
-            console.log("Payment ID:", response.razorpay_payment_id);
-            console.log("Order ID:", response.razorpay_order_id);
-            console.log("Signature:", response.razorpay_signature);
-            console.log("Full Response:", response);
+            logToConsole("PAYMENT SUCCESS RESPONSE", response);
+            
+            // Validate response data
+            if (!response.razorpay_payment_id || !response.razorpay_order_id || !response.razorpay_signature) {
+                updateStatus("❌ Incomplete payment response", "red");
+                logToConsole("ERROR", "Missing required fields in response");
+                return;
+            }
             
             // Send to backend for verification
             updateStatus("📤 Sending to backend for verification...", "blue");
             
+            const formData = new FormData();
+            formData.append('razorpay_payment_id', response.razorpay_payment_id);
+            formData.append('razorpay_order_id', response.razorpay_order_id);
+            formData.append('razorpay_signature', response.razorpay_signature);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
             fetch("/payment/verify/", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "X-CSRFToken": "{{ csrf_token }}"
-                },
-                body: new URLSearchParams(response).toString()
+                body: formData
             })
             .then(res => {
-                console.log("Backend response status:", res.status);
+                logToConsole("BACKEND RESPONSE STATUS", res.status);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
                 return res.json();
             })
             .then(data => {
-                console.log("=== BACKEND RESPONSE ===");
-                console.log(data);
+                logToConsole("BACKEND RESPONSE DATA", data);
                 
                 if (data.status === "success") {
-                    updateStatus("✅ Backend verification successful! Redirecting...", "green");
+                    updateStatus("✅ Payment verified successfully! Redirecting...", "green");
                     setTimeout(() => {
                         window.location.href = "/payment/success/";
-                    }, 1000);
+                    }, 1500);
                 } else {
-                    updateStatus("❌ Backend verification failed: " + (data.error || "Unknown error"), "red");
-                    console.error("Verification failed:", data);
+                    updateStatus("❌ Verification failed: " + (data.error || "Unknown error"), "red");
+                    console.error("Backend verification failed:", data);
                 }
             })
             .catch(error => {
-                console.error("=== FETCH ERROR ===");
-                console.error(error);
+                logToConsole("FETCH ERROR", error);
                 updateStatus("❌ Network error: " + error.message, "red");
             });
+        },
+        
+        "prefill": {
+            "name": "Test User",
+            "email": "test@example.com",
+            "contact": "9999999999"
+        },
+        
+        "notes": {
+            "address": "Test Address"
         },
         
         "modal": {
             "ondismiss": function() {
                 updateStatus("❌ Payment cancelled by user", "orange");
-                console.log("Payment modal dismissed");
+                logToConsole("PAYMENT CANCELLED", "User closed payment modal");
             }
         },
         
@@ -100,31 +129,46 @@
         }
     };
 
-    console.log("=== RAZORPAY OPTIONS ===");
-    console.log(options);
+    logToConsole("RAZORPAY OPTIONS", options);
     
-    updateStatus("🚀 Opening Razorpay checkout...", "blue");
-    var rzp1 = new Razorpay(options);
-    
-    rzp1.on('payment.failed', function (response) {
-        console.log("=== PAYMENT FAILED ===");
-        console.log(response.error);
-        updateStatus("❌ Payment failed: " + response.error.description, "red");
-    });
-    
-    rzp1.open();
+    // Initialize Razorpay
+    try {
+        updateStatus("🚀 Opening Razorpay checkout...", "blue");
+        var rzp1 = new Razorpay(options);
+        
+        rzp1.on('payment.failed', function (response) {
+            logToConsole("PAYMENT FAILED", response.error);
+            updateStatus("❌ Payment failed: " + response.error.description, "red");
+        });
+        
+        // Open payment modal
+        rzp1.open();
+        updateStatus("💳 Payment modal opened - Complete your payment", "blue");
+        
+    } catch (error) {
+        logToConsole("RAZORPAY INITIALIZATION ERROR", error);
+        updateStatus("❌ Failed to initialize payment: " + error.message, "red");
+    }
   </script>
   
   {% endif %}
 
   <div style="margin-top:30px; padding:20px; background:#fff; border-radius:8px; max-width:600px; margin:30px auto;">
-    <h3>Debug Steps:</h3>
+    <h3>Debug Checklist:</h3>
     <ol style="text-align:left;">
-      <li>Open browser console (F12)</li>
-      <li>Make payment</li>
-      <li>Check console logs for errors</li>
-      <li>Check Django terminal for backend logs</li>
+      <li><strong>Open browser console (F12)</strong> - Check for JavaScript errors</li>
+      <li><strong>Check network tab</strong> - Look for failed API calls</li>
+      <li><strong>Make test payment</strong> - Use test card: 4111 1111 1111 1111</li>
+      <li><strong>Check Django terminal</strong> - Look for backend logs</li>
+      <li><strong>Verify Razorpay dashboard</strong> - Check if payment appears there</li>
     </ol>
+    
+    <div style="background:#f0f8ff; padding:15px; margin-top:15px; border-radius:5px; text-align:left;">
+      <h4>Test Card Details:</h4>
+      <p><strong>Card Number:</strong> 4111 1111 1111 1111</p>
+      <p><strong>Expiry:</strong> Any future date (e.g., 12/25)</p>
+      <p><strong>CVV:</strong> Any 3 digits (e.g., 123)</p>
+    </div>
   </div>
 </body>
 </html>
