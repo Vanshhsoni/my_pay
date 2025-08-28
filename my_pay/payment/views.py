@@ -20,7 +20,7 @@ def payment_page(request):
     print(f"User: {request.user}")
     
     if request.method == "POST":
-        amount = 100   # 1 Rs = 100 paise
+        amount = 1000   # 1 Rs = 100 paise
         
         print(f"=== CREATING RAZORPAY ORDER ===")
         print(f"Amount: {amount}")
